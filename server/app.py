@@ -1,6 +1,9 @@
 import os
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import psycopg2
@@ -68,10 +71,18 @@ class MemoryResponse(BaseModel):
     timestamp: str
     metadata: Optional[dict] = None
 
+# Mount static files
+client_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "client")
+if os.path.exists(client_path):
+    app.mount("/static", StaticFiles(directory=client_path), name="static")
+
 # Routes
 @app.get("/")
 async def root():
-    """Root endpoint"""
+    """Root endpoint - serve the client HTML"""
+    html_path = os.path.join(client_path, "index.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
     return {
         "status": "online",
         "service": "Argus Cloud API",
@@ -123,9 +134,10 @@ async def create_memory(item: MemoryItem):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        metadata_json = json.dumps(item.metadata) if item.metadata else None
         cur.execute(
-            "INSERT INTO memory (content, metadata) VALUES (%s, %s) RETURNING *",
-            (item.content, item.metadata)
+            "INSERT INTO memory (content, metadata) VALUES (%s, %s::jsonb) RETURNING *",
+            (item.content, metadata_json)
         )
         memory = cur.fetchone()
         conn.commit()
