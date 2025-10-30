@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server/app.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "client/index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "server/app.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "client/index.html"
+    }
+  ],
+  "env": {
+    "DATABASE_URL": "@database_url",
+    "NEON_API_KEY": "@neon_api_key"
+  }
+}

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Argus Cloud</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .status.online {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.offline {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1em;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .memories {
+            margin-top: 30px;
+        }
+        
+        .memory-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .memory-content {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .memory-time {
+            color: #999;
+            font-size: 0.9em;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Argus Cloud</h1>
+        <p class="subtitle">AI Memory Management System</p>
+        
+        <div id="status" class="status offline">
+            ⚠️ Checking connection...
+        </div>
+        
+        <div class="input-group">
+            <textarea id="memoryInput" placeholder="Enter a memory to store..."></textarea>
+        </div>
+        
+        <div>
+            <button onclick="createMemory()">💾 Save Memory</button>
+            <button onclick="loadMemories()">🔄 Refresh Memories</button>
+            <button onclick="checkHealth()">🏥 Check Health</button>
+        </div>
+        
+        <div class="memories">
+            <h2>📚 Stored Memories</h2>
+            <div id="memoriesList" class="loading">Loading memories...</div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'http://localhost:8000' 
+            : '';
+        
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                const data = await response.json();
+                const statusDiv = document.getElementById('status');
+                
+                if (data.status === 'healthy') {
+                    statusDiv.className = 'status online';
+                    statusDiv.textContent = '✅ ' + data.message;
+                } else {
+                    statusDiv.className = 'status offline';
+                    statusDiv.textContent = '⚠️ Service is experiencing issues';
+                }
+            } catch (error) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.className = 'status offline';
+                statusDiv.textContent = '❌ Cannot connect to server';
+            }
+        }
+        
+        async function loadMemories() {
+            const listDiv = document.getElementById('memoriesList');
+            listDiv.innerHTML = '<div class="loading">Loading memories...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/memory`);
+                const data = await response.json();
+                
+                if (data.count === 0) {
+                    listDiv.innerHTML = '<p style="color: #999;">No memories stored yet.</p>';
+                    return;
+                }
+                
+                listDiv.innerHTML = data.data.map(memory => `
+                    <div class="memory-item">
+                        <div class="memory-content">${memory.content}</div>
+                        <div class="memory-time">${new Date(memory.timestamp).toLocaleString()}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                listDiv.innerHTML = '<p style="color: red;">Failed to load memories</p>';
+            }
+        }
+        
+        async function createMemory() {
+            const input = document.getElementById('memoryInput');
+            const content = input.value.trim();
+            
+            if (!content) {
+                alert('Please enter some content');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/memory`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ content })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    input.value = '';
+                    alert('✅ Memory saved successfully!');
+                    loadMemories();
+                } else {
+                    alert('❌ Failed to save memory');
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+        
+        // Initialize
+        checkHealth();
+        loadMemories();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            checkHealth();
+            loadMemories();
+        }, 30000);
+    </script>
+</body>
+</html>
