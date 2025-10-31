@@ -1,27 +1,12 @@
 import os
-import sys
 import json
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from mangum import Mangum
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
-app = FastAPI(title="Argus Cloud API", version="1.0.0")
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = Flask(__name__)
+CORS(app)
 
 # Database connection
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -33,41 +18,36 @@ def get_db_connection():
         return conn
     except Exception as e:
         print(f"Database connection error: {e}")
-        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
-
-# Pydantic models
-class Memory(BaseModel):
-    content: str
-    metadata: Optional[dict] = {}
+        raise Exception(f"Database connection failed: {str(e)}")
 
 # Routes
-@app.get("/")
+@app.route('/')
 def read_root():
-    return {
+    return jsonify({
         "status": "online",
         "service": "Argus Cloud API",
         "version": "1.0.0"
-    }
+    })
 
-@app.get("/api/health")
+@app.route('/api/health')
 def health_check():
     """Health check endpoint"""
     try:
         conn = get_db_connection()
         conn.close()
-        return {
+        return jsonify({
             "status": "healthy",
             "database": "connected",
             "message": "Argus Cloud is running successfully"
-        }
+        })
     except Exception as e:
-        return {
+        return jsonify({
             "status": "unhealthy",
             "database": "disconnected",
             "error": str(e)
-        }
+        }), 500
 
-@app.get("/api/memory")
+@app.route('/api/memory', methods=['GET'])
 def get_memories():
     """Get all memories"""
     try:
@@ -85,29 +65,36 @@ def get_memories():
         cur.close()
         conn.close()
         
-        return {
+        return jsonify({
             "status": "success",
             "count": len(memories),
             "data": memories
-        }
+        })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return jsonify({"error": str(e)}), 500
 
-@app.post("/api/memory")
-def create_memory(memory: Memory):
+@app.route('/api/memory', methods=['POST'])
+def create_memory():
     """Create a new memory"""
     try:
+        data = request.get_json()
+        content = data.get('content')
+        metadata = data.get('metadata', {})
+        
+        if not content:
+            return jsonify({"error": "Content is required"}), 400
+        
         conn = get_db_connection()
         cur = conn.cursor()
         
         # Convert metadata dict to JSON string
-        metadata_json = json.dumps(memory.metadata)
+        metadata_json = json.dumps(metadata)
         
         cur.execute("""
             INSERT INTO memory (content, metadata)
             VALUES (%s, %s)
             RETURNING id, content, metadata, timestamp
-        """, (memory.content, metadata_json))
+        """, (content, metadata_json))
         
         new_memory = cur.fetchone()
         
@@ -115,16 +102,16 @@ def create_memory(memory: Memory):
         cur.close()
         conn.close()
         
-        return {
+        return jsonify({
             "status": "success",
             "message": "Memory created successfully",
             "data": new_memory
-        }
+        })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return jsonify({"error": str(e)}), 500
 
-@app.delete("/api/memory/{memory_id}")
-def delete_memory(memory_id: int):
+@app.route('/api/memory/<int:memory_id>', methods=['DELETE'])
+def delete_memory(memory_id):
     """Delete a memory by ID"""
     try:
         conn = get_db_connection()
@@ -134,20 +121,19 @@ def delete_memory(memory_id: int):
         deleted = cur.fetchone()
         
         if not deleted:
-            raise HTTPException(status_code=404, detail="Memory not found")
+            return jsonify({"error": "Memory not found"}), 404
         
         conn.commit()
         cur.close()
         conn.close()
         
-        return {
+        return jsonify({
             "status": "success",
             "message": "Memory deleted successfully"
-        }
-    except HTTPException:
-        raise
+        })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return jsonify({"error": str(e)}), 500
 
-# Vercel handler with Mangum
-handler = Mangum(app, lifespan="off")
+# Vercel handler
+if __name__ == '__main__':
+    app.run(debug=True)
