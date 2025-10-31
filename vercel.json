@@ -4,8 +4,7 @@
     "api/index.py": {
       "runtime": "python3.10",
       "memory": 512,
-      "maxDuration": 10,
-      "regions": ["iad1"]
+      "maxDuration": 10
     }
   },
   "routes": [
