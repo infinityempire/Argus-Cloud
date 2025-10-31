@@ -4,8 +4,8 @@
     { "src": "api/index.py", "use": "@vercel/python" }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/", "dest": "/client/index.html" }
+    { "src": "/api/(.*)", "dest": "api/$1" },
+    { "src": "/", "dest": "client/index.html" }
   ],
   "regions": ["iad1"]
 }
