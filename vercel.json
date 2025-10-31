@@ -1,23 +1,15 @@
 {
   "version": 2,
-  "functions": {
-    "api/*.py": { 
-      "runtime": "python3.11", 
-      "maxDuration": 30 
-    }
-  },
-  "routes": [
-    { 
-      "src": "/api/(.*)", 
-      "dest": "server/app.py" 
-    },
-    { 
-      "src": "/(.*)", 
-      "dest": "client/index.html" 
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
   ],
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "NEON_API_KEY": "@neon_api_key"
-  }
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api/index.py"
+    }
+  ]
 }
